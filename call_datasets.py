@@ -1,3 +1,4 @@
+import pandas as pd
 def gas_demand():
     df = pd.read_csv("data/turkey_gas.csv")
     df = df.drop("Unnamed: 0", axis=1)
