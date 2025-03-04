@@ -14,8 +14,8 @@ if __name__ == '__main__':
     X, y, test_size = gas_demand()
     X_train = X.iloc[:-test_size]
     X_test = X.iloc[-test_size:]
-    y_train = y.iloc[:-test_size]
-    y_test = y.iloc[-test_size:]
+    y_train = y.iloc[:-test_size].to_frame()
+    y_test = y.iloc[-test_size:].to_frame()
 
 
     model = DeepAR(h=12,
@@ -25,8 +25,6 @@ if __name__ == '__main__':
                    loss=MSE(),
                    valid_loss=MSE(),
                    learning_rate=0.005,
-                   stat_exog_list=['airline1'],
-                   futr_exog_list=['trend'],
                    max_steps=100,
                    val_check_steps=10,
                    early_stop_patience_steps=-1,
