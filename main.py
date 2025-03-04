@@ -19,11 +19,11 @@ if __name__ == '__main__':
 
 
     model = DeepAR(h=12,
-                   input_size=24,
+                   input_size=len(y_train),
                    lstm_n_layers=1,
                    trajectory_samples=100,
-                   loss=MSE(outputsize_multiplier=1),
-                   valid_loss=MSE,
+                   loss=MSE(),
+                   valid_loss=MSE(),
                    learning_rate=0.005,
                    stat_exog_list=['airline1'],
                    futr_exog_list=['trend'],
@@ -37,7 +37,8 @@ if __name__ == '__main__':
     nf = NeuralForecast(
         models=[
             model
-        ]
+        ],
+        freq='ME'
     )
 
     nf.fit(df=y_train, val_size=test_size)
