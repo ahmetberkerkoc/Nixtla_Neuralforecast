@@ -6,8 +6,10 @@ def gas_demand():
     df["y-2"] = df["ABONE"].shift(2)
     df["y-3"] = df["ABONE"].shift(3)
     df = df.dropna()
-    y = df.loc[:, "ABONE"]
-    X = df.iloc[:, 1:]
+    df.reset_index(inplace=True, drop=True)
+    df["unique_id"] = range(1,len(df)+1)
+    df['ds'] = pd.date_range(start="2000-01-01 00:00:00", periods=len(df), freq="D")
 
-    test_size = int(len(df) * 0.2)
-    return X, y, test_size
+
+    test_size = int(len(df) * 0.1)
+    return df, test_size
