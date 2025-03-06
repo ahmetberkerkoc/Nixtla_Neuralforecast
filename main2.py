@@ -62,3 +62,5 @@ plt.ylabel("Gas Consumption (ABONE)")
 plt.title("DeepAR Forecast on Test Set")
 plt.legend()
 plt.savefig("figures/turkey_gas.png")
+
+print("control")
