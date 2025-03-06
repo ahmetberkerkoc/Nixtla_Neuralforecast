@@ -3,29 +3,26 @@ import matplotlib.pyplot as plt
 
 from neuralforecast import NeuralForecast
 from neuralforecast.models import DeepAR
-from neuralforecast.losses.pytorch import DistributionLoss, MQLoss, MSE
+from neuralforecast.losses.pytorch import DistributionLoss,  MQLoss
 
 from call_datasets import gas_demand
-
+from neuralforecast.utils import AirPassengersPanel, AirPassengersStatic
 
 if __name__ == "__main__":
-    X, y, test_size = gas_demand()
-    X_train = X.iloc[:-test_size]
-    X_test = X.iloc[-test_size:]
-    y_train = y.iloc[:-test_size].to_frame()
-    y_test = y.iloc[-test_size:].to_frame()
-    train_size = len(y) - test_size
-
-    model = DeepAR(
+    df, test_size = gas_demand()
+    df = df.rename(columns={'ABONE': 'y'})
+    train_size = len(df) - test_size
+    df = df.loc[:,["unique_id","ds","y"]]
+    deepar = DeepAR(
         h=test_size,
-        input_size=train_size,
+        input_size=test_size-5,
         lstm_n_layers=2,
         trajectory_samples=100,
-        loss=DistributionLoss(distribution="StudentT", level=[80, 90], return_params=True),
-        valid_loss=MQLoss(level=[80, 90]),
+        loss=DistributionLoss(distribution="StudentT",  return_params=True),
+        valid_loss=MQLoss(),
         learning_rate=0.005,
-        stat_exog_list=list(X_train.columns[-11:]),
-        futr_exog_list=list(X_train.columns[:-11]),
+        #futr_exog_list=list(df.columns[1:-2]),
+        # hist_exog_list=df.columns[1:-2],
         max_steps=100,
         val_check_steps=10,
         early_stop_patience_steps=-1,
@@ -33,8 +30,7 @@ if __name__ == "__main__":
         enable_progress_bar=True,
     )
 
-    nf = NeuralForecast(models=[model], freq="ME")
-
-    nf.fit(df=y_train, val_size=test_size, random_seed=24)
-
+    nf = NeuralForecast(models=[deepar], freq="D")
+    nf.fit(df=df[:train_size], val_size=test_size)
+    Y_hat_df = nf.predict(futr_df=df[-test_size:])
     print("control")
