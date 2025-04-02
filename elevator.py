@@ -15,21 +15,27 @@ from neuralforecast.models import (
 )
 from neuralforecast.losses.numpy import mse, mae
 from neuralforecast.losses.pytorch import MSE, MAE
+from sklearn.preprocessing import MinMaxScaler
 
-# Load data
-df = pd.read_csv("data/turkey_gas.csv")
+df = pd.read_csv("elevators/Elevators/elevators.data", sep=",", header=None)
+y_orig = df.iloc[:, -1]
+df = df.iloc[:, :-1]
+df["y"] = y_orig
+col = {i: f"{i}" for i in range(18)}
+df = df.rename(columns=col)
 
-# Rename columns
-df.rename(columns={"Unnamed: 0": "ds", "ABONE": "y"}, inplace=True)
-df["ds"] = pd.to_datetime(df["ds"])  # Convert to datetime
-df["unique_id"] = "turkey_gas"  # Single time-series
-df["y"] /= 10**7
 
-# Sort by date
-df = df.sort_values(by="ds")
+scaler = MinMaxScaler()
+df["y"] = pd.Series(scaler.fit_transform(df["y"].to_numpy()[:, None]).ravel(), df.index)
+
+
+start_date = "2000-01-01"
+df["ds"] = range(len(df))  # Convert to datetime
+df["unique_id"] = "elevator"  # Single time-series
+
 
 # Split into train (80%) and test (20%)
-train_size = len(df) - int(len(df) * 0.2)
+train_size = len(df) - 400  # int(len(df) * 0.2)
 train_df = df.iloc[:train_size]
 test_df = df.iloc[train_size:]
 
@@ -38,46 +44,46 @@ forecast_horizon = len(test_df)
 
 # Define and train the DeepAR model
 models = [
-    DeepAR(
-        h=forecast_horizon,
-        input_size=35,
-        max_steps=3000,
-        # scaler_type="standard",
-        learning_rate=0.00003,
-        # futr_exog_list=["ABONE_SICAKLIK_HI", "ABONE_SICAKLIK_MIN", "ABONE_RUZGAR_HI", "ABONE_RUZGAR_AVG"]
-        futr_exog_list=list(train_df.columns[3:-1]),
-        batch_size=1,
-    ),
+    # DeepAR(
+    #     h=forecast_horizon,
+    #     input_size=30,
+    #     max_steps=1000,
+    #     # scaler_type="standard",
+    #     learning_rate=0.00001,
+    #     # futr_exog_list=["ABONE_SICAKLIK_HI", "ABONE_SICAKLIK_MIN", "ABONE_RUZGAR_HI", "ABONE_RUZGAR_AVG"]
+    #     futr_exog_list=list(train_df.columns[:18]),
+    #     batch_size=1,
+    # ),
     # Informer(
     #     h=forecast_horizon,
-    #     input_size=100,
+    #     input_size=30,
     #     hidden_size=32,
     #     conv_hidden_size=64,
     #     n_head=2,
     #     loss=MSE(),
-    #     # futr_exog_list=list(train_df.columns[3:-1]),
+    #     futr_exog_list=list(train_df.columns[3:-1]),
     #     scaler_type="identity",
     #     learning_rate=1e-3,
     #     max_steps=1000,
-    #     # val_check_steps=50,
-    #     # early_stop_patience_steps=2
+    #     val_check_steps=50,
+    #     early_stop_patience_steps=2
     # ),
-    # iTransformer(
-    #     h=forecast_horizon,
-    #     input_size=60,
-    #     n_series=1,
-    #     hidden_size=128,
-    #     n_heads=4,
-    #     e_layers=2,
-    #     d_layers=1,
-    #     d_ff=1024,
-    #     factor=1,
-    #     dropout=0.1,
-    #     use_norm=True,
-    #     loss=MSE(),
-    #     max_steps=1000,
-    #     learning_rate=1e-3,
-    # ),
+    iTransformer(
+        h=forecast_horizon,
+        input_size=60,
+        n_series=1,
+        hidden_size=128,
+        n_heads=4,
+        e_layers=2,
+        d_layers=1,
+        d_ff=1024,
+        factor=1,
+        dropout=0.1,
+        use_norm=True,
+        loss=MSE(),
+        max_steps=1000,
+        learning_rate=1e-3,
+    ),
     #   TFT(
     #       h=forecast_horizon,
     #       input_size=15,
@@ -126,7 +132,7 @@ models = [
 ]
 
 
-nf = NeuralForecast(models=models, freq="D")
+nf = NeuralForecast(models=models, freq=1)
 nf.fit(train_df)
 
 # Make predictions for the test period
@@ -135,22 +141,22 @@ forecast_df = forecast_df.iloc[:forecast_horizon]
 
 for model_name in nf.models:
     model_name = str(model_name)
-    fores = forecast_df[model_name] * (10**7)
+    fores = forecast_df[model_name]
     fores = fores.to_numpy()
+    fores = scaler.inverse_transform(fores[:, None]).ravel()
 
-    tests = test_df["y"] * (10**7)
-    tests = tests.to_numpy()
+    tests = y_orig[-forecast_horizon:]
 
-    print("MSE: {:e}".format(mse(tests[-forecast_horizon:], fores[-forecast_horizon:])))
-    print("MAE: {:e}".format(mae(tests[-forecast_horizon:], fores[-forecast_horizon:])))
+    print("MSE: {:e}".format(mse(tests[-forecast_horizon:].to_numpy(), fores[-forecast_horizon:])))
+    print("MAE: {:e}".format(mae(tests[-forecast_horizon:].to_numpy(), fores[-forecast_horizon:])))
 
     # Plot train, test, and forecasted values
     plt.figure(figsize=(12, 6))
-    plt.plot(train_df["ds"], train_df["y"] * (10**7), label="Train Data", color="blue", linewidth=2)
-    plt.plot(test_df["ds"], test_df["y"] * (10**7), label="Test Data", color="green", linewidth=2)
+    plt.plot(train_df["ds"], y_orig[:-forecast_horizon], label="Train Data", color="blue", linewidth=2)
+    plt.plot(test_df["ds"], tests, label="Test Data", color="green", linewidth=2)
     plt.plot(
         forecast_df["ds"],
-        forecast_df[model_name] * (10**7),
+        fores,
         label="Forecast",
         color="red",
         linestyle="dashed",
